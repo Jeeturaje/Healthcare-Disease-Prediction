@@ -2,6 +2,11 @@ import streamlit as st
 import pandas as pd
 import joblib
 import os
+from io import BytesIO
+
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from reportlab.lib import colors
 
 
 # =========================================================
@@ -12,6 +17,17 @@ st.set_page_config(
     page_title="Diabetes Prediction",
     page_icon="🩺",
     layout="centered"
+)
+
+
+# =========================================================
+# PROJECT PATH
+# =========================================================
+
+BASE_DIR = os.path.dirname(
+    os.path.dirname(
+        os.path.abspath(__file__)
+    )
 )
 
 
@@ -53,16 +69,7 @@ st.markdown("""
 
 
 # =========================================================
-# PROJECT PATH
-# =========================================================
-
-BASE_DIR = os.path.dirname(
-    os.path.dirname(os.path.abspath(__file__))
-)
-
-
-# =========================================================
-# MODEL PATH
+# LOAD MODEL
 # =========================================================
 
 model_path = os.path.join(
@@ -78,12 +85,298 @@ scaler_path = os.path.join(
 )
 
 
+try:
+
+    model = joblib.load(model_path)
+
+    scaler = joblib.load(scaler_path)
+
+except Exception as e:
+
+    st.error(
+        f"Model loading error: {e}"
+    )
+
+    st.stop()
+
+
 # =========================================================
-# LOAD MODEL
+# PDF REPORT FUNCTION
 # =========================================================
 
-model = joblib.load(model_path)
-scaler = joblib.load(scaler_path)
+def create_pdf_report(
+    pregnancies,
+    glucose,
+    blood_pressure,
+    skin_thickness,
+    insulin,
+    bmi,
+    diabetes_pedigree,
+    age,
+    prediction,
+    probability
+):
+
+    # Memory mein PDF create hoga
+    buffer = BytesIO()
+
+    pdf = canvas.Canvas(
+        buffer,
+        pagesize=A4
+    )
+
+    width, height = A4
+
+    # =====================================================
+    # TITLE
+    # =====================================================
+
+    pdf.setFillColor(
+        colors.HexColor("#0b5ed7")
+    )
+
+    pdf.setFont(
+        "Helvetica-Bold",
+        20
+    )
+
+    pdf.drawCentredString(
+        width / 2,
+        height - 60,
+        "Healthcare Disease Prediction"
+    )
+
+    pdf.setFillColor(
+        colors.black
+    )
+
+    pdf.setFont(
+        "Helvetica",
+        12
+    )
+
+    pdf.drawCentredString(
+        width / 2,
+        height - 85,
+        "Diabetes Risk Prediction Report"
+    )
+
+
+    # =====================================================
+    # PATIENT INFORMATION
+    # =====================================================
+
+    y = height - 130
+
+    pdf.setFont(
+        "Helvetica-Bold",
+        14
+    )
+
+    pdf.drawString(
+        50,
+        y,
+        "Patient Information"
+    )
+
+    y -= 30
+
+    pdf.setFont(
+        "Helvetica",
+        11
+    )
+
+    information = [
+
+        f"Pregnancies: {pregnancies}",
+
+        f"Glucose: {glucose}",
+
+        f"Blood Pressure: {blood_pressure}",
+
+        f"Skin Thickness: {skin_thickness}",
+
+        f"Insulin: {insulin}",
+
+        f"BMI: {bmi}",
+
+        f"Diabetes Pedigree Function: "
+        f"{diabetes_pedigree}",
+
+        f"Age: {age}"
+    ]
+
+
+    for item in information:
+
+        pdf.drawString(
+            70,
+            y,
+            item
+        )
+
+        y -= 22
+
+
+    # =====================================================
+    # PREDICTION RESULT
+    # =====================================================
+
+    y -= 15
+
+    pdf.setFont(
+        "Helvetica-Bold",
+        14
+    )
+
+    pdf.drawString(
+        50,
+        y,
+        "Prediction Result"
+    )
+
+    y -= 30
+
+    pdf.setFont(
+        "Helvetica",
+        11
+    )
+
+
+    if prediction == 1:
+
+        result = (
+            "Higher Diabetes Risk Detected"
+        )
+
+    else:
+
+        result = (
+            "Lower Diabetes Risk Detected"
+        )
+
+
+    pdf.drawString(
+        70,
+        y,
+        f"Result: {result}"
+    )
+
+    y -= 25
+
+    pdf.drawString(
+        70,
+        y,
+        "Diabetes Probability: "
+        f"{probability * 100:.2f}%"
+    )
+
+
+    # =====================================================
+    # MODEL INFORMATION
+    # =====================================================
+
+    y -= 50
+
+    pdf.setFont(
+        "Helvetica-Bold",
+        14
+    )
+
+    pdf.drawString(
+        50,
+        y,
+        "Machine Learning Model"
+    )
+
+    y -= 25
+
+    pdf.setFont(
+        "Helvetica",
+        11
+    )
+
+    pdf.drawString(
+        70,
+        y,
+        "Best Performing Model"
+    )
+
+
+    # =====================================================
+    # DISCLAIMER
+    # =====================================================
+
+    y -= 55
+
+    pdf.setFont(
+        "Helvetica-Bold",
+        12
+    )
+
+    pdf.drawString(
+        50,
+        y,
+        "Medical Disclaimer"
+    )
+
+    y -= 25
+
+    pdf.setFont(
+        "Helvetica",
+        9
+    )
+
+    disclaimer = [
+
+        "This application is developed for "
+        "educational purposes only.",
+
+        "It is not a substitute for professional "
+        "medical diagnosis or treatment.",
+
+        "Please consult a qualified healthcare "
+        "professional for medical advice."
+    ]
+
+
+    for line in disclaimer:
+
+        pdf.drawString(
+            50,
+            y,
+            line
+        )
+
+        y -= 15
+
+
+    # =====================================================
+    # FOOTER
+    # =====================================================
+
+    pdf.setFont(
+        "Helvetica",
+        8
+    )
+
+    pdf.drawCentredString(
+        width / 2,
+        30,
+        "Healthcare Disease Prediction | "
+        "Machine Learning Project"
+    )
+
+
+    # =====================================================
+    # SAVE PDF TO MEMORY
+    # =====================================================
+
+    pdf.save()
+
+    buffer.seek(0)
+
+    return buffer.getvalue()
 
 
 # =========================================================
@@ -91,18 +384,24 @@ scaler = joblib.load(scaler_path)
 # =========================================================
 
 st.markdown(
-    '<div class="title">🩺 Healthcare AI</div>',
+    '<div class="title">'
+    '🩺 Healthcare AI'
+    '</div>',
     unsafe_allow_html=True
 )
 
 st.markdown(
-    '<div class="subtitle">Diabetes Risk Prediction System</div>',
+    '<div class="subtitle">'
+    'Diabetes Risk Prediction System'
+    '</div>',
     unsafe_allow_html=True
 )
 
+
 st.info(
-    "Enter patient health information below to "
-    "estimate diabetes risk using Machine Learning."
+    "Enter patient health information below "
+    "to estimate diabetes risk using "
+    "Machine Learning."
 )
 
 
@@ -176,7 +475,7 @@ with col2:
 
 
 # =========================================================
-# PREDICTION BUTTON
+# PREDICTION
 # =========================================================
 
 if st.button(
@@ -184,9 +483,9 @@ if st.button(
     use_container_width=True
 ):
 
-    # =====================================================
-    # CREATE INPUT DATA
-    # =====================================================
+    # -----------------------------------------------------
+    # INPUT DATA
+    # -----------------------------------------------------
 
     input_data = pd.DataFrame({
 
@@ -202,34 +501,53 @@ if st.button(
 
         "BMI": [bmi],
 
-        "DiabetesPedigreeFunction": [
-            diabetes_pedigree
-        ],
+        "DiabetesPedigreeFunction":
+            [diabetes_pedigree],
 
         "Age": [age]
     })
 
 
-    # =====================================================
-    # SCALE INPUT
-    # =====================================================
+    # -----------------------------------------------------
+    # SCALE
+    # -----------------------------------------------------
 
-    input_scaled = scaler.transform(
-        input_data
-    )
+    try:
+
+        input_scaled = scaler.transform(
+            input_data
+        )
+
+    except Exception as e:
+
+        st.error(
+            f"Input processing error: {e}"
+        )
+
+        st.stop()
 
 
-    # =====================================================
+    # -----------------------------------------------------
     # PREDICTION
-    # =====================================================
+    # -----------------------------------------------------
 
-    prediction = model.predict(
-        input_scaled
-    )[0]
+    try:
 
-    probability = model.predict_proba(
-        input_scaled
-    )[0][1]
+        prediction = model.predict(
+            input_scaled
+        )[0]
+
+        probability = model.predict_proba(
+            input_scaled
+        )[0][1]
+
+    except Exception as e:
+
+        st.error(
+            f"Prediction error: {e}"
+        )
+
+        st.stop()
 
 
     # =====================================================
@@ -238,11 +556,8 @@ if st.button(
 
     st.divider()
 
-    st.subheader("🔮 Prediction Result")
-
-    st.markdown(
-        '<div class="result-box">',
-        unsafe_allow_html=True
+    st.subheader(
+        "🔮 Prediction Result"
     )
 
 
@@ -252,7 +567,9 @@ if st.button(
             "⚠️ Higher Diabetes Risk Detected"
         )
 
-        risk_result = "Higher Diabetes Risk Detected"
+        risk_result = (
+            "Higher Diabetes Risk Detected"
+        )
 
     else:
 
@@ -260,12 +577,14 @@ if st.button(
             "✅ Lower Diabetes Risk Detected"
         )
 
-        risk_result = "Lower Diabetes Risk Detected"
+        risk_result = (
+            "Lower Diabetes Risk Detected"
+        )
 
 
-    # =====================================================
+    # -----------------------------------------------------
     # PROBABILITY
-    # =====================================================
+    # -----------------------------------------------------
 
     st.metric(
         "Diabetes Probability",
@@ -277,14 +596,8 @@ if st.button(
     )
 
 
-    st.markdown(
-        '</div>',
-        unsafe_allow_html=True
-    )
-
-
     # =====================================================
-    # DOWNLOAD REPORT
+    # PDF REPORT
     # =====================================================
 
     st.divider()
@@ -294,63 +607,52 @@ if st.button(
     )
 
 
-    report = f"""
-==================================================
-       HEALTHCARE DISEASE PREDICTION REPORT
-==================================================
+    try:
 
-Patient Information
---------------------------------------------------
+        pdf_data = create_pdf_report(
 
-Pregnancies                 : {pregnancies}
-Glucose                     : {glucose}
-Blood Pressure              : {blood_pressure}
-Skin Thickness              : {skin_thickness}
-Insulin                     : {insulin}
-BMI                         : {bmi}
-Diabetes Pedigree Function  : {diabetes_pedigree}
-Age                         : {age}
+            pregnancies,
 
+            glucose,
 
-Prediction Result
---------------------------------------------------
+            blood_pressure,
 
-Result                      : {risk_result}
-Diabetes Probability        : {probability * 100:.2f}%
+            skin_thickness,
 
+            insulin,
 
-Machine Learning Model
---------------------------------------------------
+            bmi,
 
-Model used: Best Performing Model
+            diabetes_pedigree,
+
+            age,
+
+            prediction,
+
+            probability
+        )
 
 
-Medical Disclaimer
---------------------------------------------------
+        st.download_button(
 
-This application is developed for educational
-and demonstration purposes only.
+            label="📄 Download PDF Report",
 
-The prediction generated by this application
-is NOT a medical diagnosis.
+            data=pdf_data,
 
-Please consult a qualified healthcare professional
-for medical advice.
+            file_name=(
+                "diabetes_prediction_report.pdf"
+            ),
 
+            mime="application/pdf",
 
-==================================================
-              END OF REPORT
-==================================================
-"""
+            use_container_width=True
+        )
 
+    except Exception as e:
 
-    st.download_button(
-        label="📥 Download Prediction Report",
-        data=report,
-        file_name="diabetes_prediction_report.txt",
-        mime="text/plain",
-        use_container_width=True
-    )
+        st.error(
+            f"PDF generation error: {e}"
+        )
 
 
 # =========================================================
@@ -371,39 +673,78 @@ comparison_path = os.path.join(
 )
 
 
-if os.path.exists(comparison_path):
+if os.path.exists(
+    comparison_path
+):
 
-    results = pd.read_csv(
-        comparison_path
-    )
+    try:
 
-
-    st.dataframe(
-        results,
-        use_container_width=True
-    )
+        results = pd.read_csv(
+            comparison_path
+        )
 
 
-    st.subheader(
-        "📈 Model Comparison"
-    )
+        st.dataframe(
+            results,
+            use_container_width=True
+        )
 
 
-    chart_data = results.set_index(
-        "Model"
-    )[
-        [
+        # -------------------------------------------------
+        # MODEL COMPARISON CHART
+        # -------------------------------------------------
+
+        st.subheader(
+            "📈 Model Comparison"
+        )
+
+
+        required_columns = [
+            "Model",
             "Accuracy",
             "Precision",
             "Recall",
             "F1 Score"
         ]
-    ]
 
 
-    st.bar_chart(
-        chart_data
-    )
+        if all(
+            col in results.columns
+            for col in required_columns
+        ):
+
+            chart_data = results.set_index(
+                "Model"
+            )[
+
+                [
+                    "Accuracy",
+                    "Precision",
+                    "Recall",
+                    "F1 Score"
+                ]
+
+            ]
+
+
+            st.bar_chart(
+                chart_data
+            )
+
+        else:
+
+            st.warning(
+                "Required model performance "
+                "columns are missing."
+            )
+
+
+    except Exception as e:
+
+        st.error(
+            f"Could not read model comparison: {e}"
+        )
+
 
 else:
 
@@ -424,9 +765,9 @@ st.header(
 
 
 st.write("""
-This Healthcare Disease Prediction system uses
-Machine Learning to estimate diabetes risk based
-on patient health parameters.
+This Healthcare Disease Prediction system
+uses Machine Learning to estimate diabetes
+risk based on patient health parameters.
 
 Models evaluated:
 
@@ -434,11 +775,18 @@ Models evaluated:
 • Random Forest
 • XGBoost
 
-The best-performing model is used for the final
-prediction system.
+The best-performing model is used for
+the final prediction system.
 
-The application is developed using Python,
-Scikit-learn, XGBoost, Pandas and Streamlit.
+Technologies used:
+
+• Python
+• Pandas
+• NumPy
+• Scikit-learn
+• XGBoost
+• Streamlit
+• ReportLab
 """)
 
 
@@ -447,10 +795,11 @@ Scikit-learn, XGBoost, Pandas and Streamlit.
 # =========================================================
 
 st.warning(
-    "⚠️ Medical Disclaimer: This application is "
-    "developed for educational and demonstration "
-    "purposes only. It is not a substitute for "
-    "professional medical diagnosis or treatment."
+    "⚠️ Medical Disclaimer: This application "
+    "is developed for educational and "
+    "demonstration purposes only. It is not "
+    "a substitute for professional medical "
+    "diagnosis or treatment."
 )
 
 
@@ -489,7 +838,6 @@ with col1:
             "Confusion Matrix"
         )
 
-
         st.image(
             confusion_path,
             use_container_width=True
@@ -522,7 +870,6 @@ with col2:
         st.subheader(
             "ROC Curve"
         )
-
 
         st.image(
             roc_path,
