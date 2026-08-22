@@ -3,9 +3,21 @@ import pandas as pd
 import joblib
 import os
 
-# ==============================
-# Custom CSS
-# ==============================
+
+# =========================================================
+# PAGE CONFIGURATION
+# =========================================================
+
+st.set_page_config(
+    page_title="Diabetes Prediction",
+    page_icon="🩺",
+    layout="centered"
+)
+
+
+# =========================================================
+# CUSTOM CSS
+# =========================================================
 
 st.markdown("""
 <style>
@@ -40,18 +52,18 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# ==============================
-# Project Path
-# ==============================
+# =========================================================
+# PROJECT PATH
+# =========================================================
 
 BASE_DIR = os.path.dirname(
     os.path.dirname(os.path.abspath(__file__))
 )
 
 
-# ==============================
-# Model Path
-# ==============================
+# =========================================================
+# MODEL PATH
+# =========================================================
 
 model_path = os.path.join(
     BASE_DIR,
@@ -66,28 +78,17 @@ scaler_path = os.path.join(
 )
 
 
-# ==============================
-# Load Model
-# ==============================
+# =========================================================
+# LOAD MODEL
+# =========================================================
 
 model = joblib.load(model_path)
 scaler = joblib.load(scaler_path)
 
 
-# ==============================
-# Page Configuration
-# ==============================
-
-st.set_page_config(
-    page_title="Diabetes Prediction",
-    page_icon="🩺",
-    layout="centered"
-)
-
-
-# ==============================
-# Title
-# ==============================
+# =========================================================
+# TITLE
+# =========================================================
 
 st.markdown(
     '<div class="title">🩺 Healthcare AI</div>',
@@ -104,9 +105,10 @@ st.info(
     "estimate diabetes risk using Machine Learning."
 )
 
-# ==============================
-# Input Fields
-# ==============================
+
+# =========================================================
+# INPUT FIELDS
+# =========================================================
 
 col1, col2 = st.columns(2)
 
@@ -173,11 +175,18 @@ with col2:
     )
 
 
-# ==============================
-# Prediction Button
-# ==============================
+# =========================================================
+# PREDICTION BUTTON
+# =========================================================
 
-if st.button("🔍 Predict Diabetes Risk"):
+if st.button(
+    "🔍 Predict Diabetes Risk",
+    use_container_width=True
+):
+
+    # =====================================================
+    # CREATE INPUT DATA
+    # =====================================================
 
     input_data = pd.DataFrame({
 
@@ -201,32 +210,41 @@ if st.button("🔍 Predict Diabetes Risk"):
     })
 
 
-    # ==============================
-    # Scale Input
-    # ==============================
+    # =====================================================
+    # SCALE INPUT
+    # =====================================================
 
-    input_scaled = scaler.transform(input_data)
+    input_scaled = scaler.transform(
+        input_data
+    )
 
 
-    # ==============================
-    # Prediction
-    # ==============================
+    # =====================================================
+    # PREDICTION
+    # =====================================================
 
-    prediction = model.predict(input_scaled)[0]
+    prediction = model.predict(
+        input_scaled
+    )[0]
 
     probability = model.predict_proba(
         input_scaled
     )[0][1]
 
 
-    # ==============================
-    # Result
-    # ==============================
+    # =====================================================
+    # RESULT
+    # =====================================================
+
+    st.divider()
+
+    st.subheader("🔮 Prediction Result")
 
     st.markdown(
         '<div class="result-box">',
         unsafe_allow_html=True
     )
+
 
     if prediction == 1:
 
@@ -234,31 +252,117 @@ if st.button("🔍 Predict Diabetes Risk"):
             "⚠️ Higher Diabetes Risk Detected"
         )
 
+        risk_result = "Higher Diabetes Risk Detected"
+
     else:
 
         st.success(
             "✅ Lower Diabetes Risk Detected"
         )
 
+        risk_result = "Lower Diabetes Risk Detected"
+
+
+    # =====================================================
+    # PROBABILITY
+    # =====================================================
+
     st.metric(
         "Diabetes Probability",
         f"{probability * 100:.2f}%"
     )
 
-    st.progress(float(probability))
+    st.progress(
+        float(probability)
+    )
+
 
     st.markdown(
         '</div>',
         unsafe_allow_html=True
     )
-    
-# ==============================
-# Model Performance
-# ==============================
+
+
+    # =====================================================
+    # DOWNLOAD REPORT
+    # =====================================================
+
+    st.divider()
+
+    st.subheader(
+        "📥 Download Prediction Report"
+    )
+
+
+    report = f"""
+==================================================
+       HEALTHCARE DISEASE PREDICTION REPORT
+==================================================
+
+Patient Information
+--------------------------------------------------
+
+Pregnancies                 : {pregnancies}
+Glucose                     : {glucose}
+Blood Pressure              : {blood_pressure}
+Skin Thickness              : {skin_thickness}
+Insulin                     : {insulin}
+BMI                         : {bmi}
+Diabetes Pedigree Function  : {diabetes_pedigree}
+Age                         : {age}
+
+
+Prediction Result
+--------------------------------------------------
+
+Result                      : {risk_result}
+Diabetes Probability        : {probability * 100:.2f}%
+
+
+Machine Learning Model
+--------------------------------------------------
+
+Model used: Best Performing Model
+
+
+Medical Disclaimer
+--------------------------------------------------
+
+This application is developed for educational
+and demonstration purposes only.
+
+The prediction generated by this application
+is NOT a medical diagnosis.
+
+Please consult a qualified healthcare professional
+for medical advice.
+
+
+==================================================
+              END OF REPORT
+==================================================
+"""
+
+
+    st.download_button(
+        label="📥 Download Prediction Report",
+        data=report,
+        file_name="diabetes_prediction_report.txt",
+        mime="text/plain",
+        use_container_width=True
+    )
+
+
+# =========================================================
+# MODEL PERFORMANCE
+# =========================================================
 
 st.divider()
 
-st.header("📊 Model Performance")
+st.header(
+    "📊 Model Performance"
+)
+
 
 comparison_path = os.path.join(
     BASE_DIR,
@@ -266,35 +370,58 @@ comparison_path = os.path.join(
     "model_comparison.csv"
 )
 
+
 if os.path.exists(comparison_path):
 
-    results = pd.read_csv(comparison_path)
+    results = pd.read_csv(
+        comparison_path
+    )
+
 
     st.dataframe(
         results,
         use_container_width=True
     )
 
-    st.subheader("📈 Model Comparison")
 
-    chart_data = results.set_index("Model")[
-        ["Accuracy", "Precision", "Recall", "F1 Score"]
+    st.subheader(
+        "📈 Model Comparison"
+    )
+
+
+    chart_data = results.set_index(
+        "Model"
+    )[
+        [
+            "Accuracy",
+            "Precision",
+            "Recall",
+            "F1 Score"
+        ]
     ]
 
-    st.bar_chart(chart_data)
+
+    st.bar_chart(
+        chart_data
+    )
 
 else:
 
     st.warning(
         "Model comparison data not found."
     )
-    
-# ==============================
-# About Project Section
-# ==============================
+
+
+# =========================================================
+# ABOUT PROJECT
+# =========================================================
+
 st.divider()
 
-st.header("ℹ️ About This Project")
+st.header(
+    "ℹ️ About This Project"
+)
+
 
 st.write("""
 This Healthcare Disease Prediction system uses
@@ -309,23 +436,41 @@ Models evaluated:
 
 The best-performing model is used for the final
 prediction system.
+
+The application is developed using Python,
+Scikit-learn, XGBoost, Pandas and Streamlit.
 """)
 
+
+# =========================================================
+# MEDICAL DISCLAIMER
+# =========================================================
+
 st.warning(
-    "⚠️ This application is developed for educational "
-    "and demonstration purposes only. It is not a "
-    "substitute for professional medical diagnosis."
+    "⚠️ Medical Disclaimer: This application is "
+    "developed for educational and demonstration "
+    "purposes only. It is not a substitute for "
+    "professional medical diagnosis or treatment."
 )
 
-# ==============================
-# Evaluation Charts
-# ==============================
+
+# =========================================================
+# MODEL EVALUATION
+# =========================================================
 
 st.divider()
 
-st.header("📈 Model Evaluation")
+st.header(
+    "📈 Model Evaluation"
+)
+
 
 col1, col2 = st.columns(2)
+
+
+# =========================================================
+# CONFUSION MATRIX
+# =========================================================
 
 with col1:
 
@@ -335,15 +480,31 @@ with col1:
         "confusion_matrix.png"
     )
 
-    if os.path.exists(confusion_path):
 
-        st.subheader("Confusion Matrix")
+    if os.path.exists(
+        confusion_path
+    ):
+
+        st.subheader(
+            "Confusion Matrix"
+        )
+
 
         st.image(
             confusion_path,
             use_container_width=True
         )
 
+    else:
+
+        st.warning(
+            "Confusion matrix image not found."
+        )
+
+
+# =========================================================
+# ROC CURVE
+# =========================================================
 
 with col2:
 
@@ -353,11 +514,36 @@ with col2:
         "roc_curve.png"
     )
 
-    if os.path.exists(roc_path):
 
-        st.subheader("ROC Curve")
+    if os.path.exists(
+        roc_path
+    ):
+
+        st.subheader(
+            "ROC Curve"
+        )
+
 
         st.image(
             roc_path,
             use_container_width=True
         )
+
+    else:
+
+        st.warning(
+            "ROC curve image not found."
+        )
+
+
+# =========================================================
+# FOOTER
+# =========================================================
+
+st.divider()
+
+st.caption(
+    "🩺 Healthcare Disease Prediction | "
+    "Machine Learning Project | "
+    "Developed using Python & Streamlit"
+)
