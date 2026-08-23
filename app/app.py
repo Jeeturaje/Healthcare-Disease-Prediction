@@ -2,8 +2,9 @@ import streamlit as st
 import pandas as pd
 import joblib
 import os
-from io import BytesIO
+import mysql.connector
 
+from io import BytesIO
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
@@ -29,6 +30,23 @@ BASE_DIR = os.path.dirname(
         os.path.abspath(__file__)
     )
 )
+
+
+# =========================================================
+# MYSQL DATABASE CONNECTION
+# =========================================================
+
+def get_db_connection():
+
+    connection = mysql.connector.connect(
+        host=st.secrets["mysql"]["host"],
+        user=st.secrets["mysql"]["user"],
+        password=st.secrets["mysql"]["password"],
+        database=st.secrets["mysql"]["database"],
+        port=st.secrets["mysql"]["port"]
+    )
+
+    return connection
 
 
 # =========================================================
@@ -84,11 +102,9 @@ scaler_path = os.path.join(
     "scaler.pkl"
 )
 
-
 try:
 
     model = joblib.load(model_path)
-
     scaler = joblib.load(scaler_path)
 
 except Exception as e:
@@ -117,7 +133,6 @@ def create_pdf_report(
     probability
 ):
 
-    # Memory mein PDF create hoga
     buffer = BytesIO()
 
     pdf = canvas.Canvas(
@@ -126,6 +141,7 @@ def create_pdf_report(
     )
 
     width, height = A4
+
 
     # =====================================================
     # TITLE
@@ -200,8 +216,7 @@ def create_pdf_report(
 
         f"BMI: {bmi}",
 
-        f"Diabetes Pedigree Function: "
-        f"{diabetes_pedigree}",
+        f"Diabetes Pedigree Function: {diabetes_pedigree}",
 
         f"Age: {age}"
     ]
@@ -245,15 +260,11 @@ def create_pdf_report(
 
     if prediction == 1:
 
-        result = (
-            "Higher Diabetes Risk Detected"
-        )
+        result = "Higher Diabetes Risk Detected"
 
     else:
 
-        result = (
-            "Lower Diabetes Risk Detected"
-        )
+        result = "Lower Diabetes Risk Detected"
 
 
     pdf.drawString(
@@ -267,8 +278,7 @@ def create_pdf_report(
     pdf.drawString(
         70,
         y,
-        "Diabetes Probability: "
-        f"{probability * 100:.2f}%"
+        f"Diabetes Probability: {probability * 100:.2f}%"
     )
 
 
@@ -329,14 +339,11 @@ def create_pdf_report(
 
     disclaimer = [
 
-        "This application is developed for "
-        "educational purposes only.",
+        "This application is developed for educational purposes only.",
 
-        "It is not a substitute for professional "
-        "medical diagnosis or treatment.",
+        "It is not a substitute for professional medical diagnosis or treatment.",
 
-        "Please consult a qualified healthcare "
-        "professional for medical advice."
+        "Please consult a qualified healthcare professional for medical advice."
     ]
 
 
@@ -363,14 +370,9 @@ def create_pdf_report(
     pdf.drawCentredString(
         width / 2,
         30,
-        "Healthcare Disease Prediction | "
-        "Machine Learning Project"
+        "Healthcare Disease Prediction | Machine Learning Project"
     )
 
-
-    # =====================================================
-    # SAVE PDF TO MEMORY
-    # =====================================================
 
     pdf.save()
 
@@ -384,24 +386,18 @@ def create_pdf_report(
 # =========================================================
 
 st.markdown(
-    '<div class="title">'
-    '🩺 Healthcare AI'
-    '</div>',
+    '<div class="title">🩺 Healthcare AI</div>',
     unsafe_allow_html=True
 )
 
 st.markdown(
-    '<div class="subtitle">'
-    'Diabetes Risk Prediction System'
-    '</div>',
+    '<div class="subtitle">Diabetes Risk Prediction System</div>',
     unsafe_allow_html=True
 )
 
-
 st.info(
     "Enter patient health information below "
-    "to estimate diabetes risk using "
-    "Machine Learning."
+    "to estimate diabetes risk using Machine Learning."
 )
 
 
@@ -475,7 +471,7 @@ with col2:
 
 
 # =========================================================
-# PREDICTION
+# PREDICTION BUTTON
 # =========================================================
 
 if st.button(
@@ -483,9 +479,9 @@ if st.button(
     use_container_width=True
 ):
 
-    # -----------------------------------------------------
-    # INPUT DATA
-    # -----------------------------------------------------
+    # =====================================================
+    # CREATE INPUT DATA
+    # =====================================================
 
     input_data = pd.DataFrame({
 
@@ -501,16 +497,17 @@ if st.button(
 
         "BMI": [bmi],
 
-        "DiabetesPedigreeFunction":
-            [diabetes_pedigree],
+        "DiabetesPedigreeFunction": [
+            diabetes_pedigree
+        ],
 
         "Age": [age]
     })
 
 
-    # -----------------------------------------------------
-    # SCALE
-    # -----------------------------------------------------
+    # =====================================================
+    # SCALE INPUT
+    # =====================================================
 
     try:
 
@@ -527,9 +524,9 @@ if st.button(
         st.stop()
 
 
-    # -----------------------------------------------------
+    # =====================================================
     # PREDICTION
-    # -----------------------------------------------------
+    # =====================================================
 
     try:
 
@@ -548,6 +545,85 @@ if st.button(
         )
 
         st.stop()
+
+
+    # =====================================================
+    # SAVE PREDICTION TO MYSQL
+    # =====================================================
+
+    try:
+
+        connection = get_db_connection()
+
+        cursor = connection.cursor()
+
+
+        query = """
+        INSERT INTO prediction_history
+        (
+            pregnancies,
+            glucose,
+            blood_pressure,
+            skin_thickness,
+            insulin,
+            bmi,
+            diabetes_pedigree,
+            age,
+            prediction,
+            probability
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
+
+
+        values = (
+
+            pregnancies,
+
+            glucose,
+
+            blood_pressure,
+
+            skin_thickness,
+
+            insulin,
+
+            bmi,
+
+            diabetes_pedigree,
+
+            age,
+
+            "Higher Risk"
+            if prediction == 1
+            else "Lower Risk",
+
+            float(probability)
+        )
+
+
+        cursor.execute(
+            query,
+            values
+        )
+
+        connection.commit()
+
+        cursor.close()
+
+        connection.close()
+
+
+        st.success(
+            "✅ Prediction saved to MySQL database!"
+        )
+
+
+    except Exception as e:
+
+        st.warning(
+            f"⚠️ Database Error: {e}"
+        )
 
 
     # =====================================================
@@ -582,9 +658,9 @@ if st.button(
         )
 
 
-    # -----------------------------------------------------
+    # =====================================================
     # PROBABILITY
-    # -----------------------------------------------------
+    # =====================================================
 
     st.metric(
         "Diabetes Probability",
@@ -639,14 +715,13 @@ if st.button(
 
             data=pdf_data,
 
-            file_name=(
-                "diabetes_prediction_report.pdf"
-            ),
+            file_name="diabetes_prediction_report.pdf",
 
             mime="application/pdf",
 
             use_container_width=True
         )
+
 
     except Exception as e:
 
@@ -690,20 +765,21 @@ if os.path.exists(
         )
 
 
-        # -------------------------------------------------
-        # MODEL COMPARISON CHART
-        # -------------------------------------------------
-
         st.subheader(
             "📈 Model Comparison"
         )
 
 
         required_columns = [
+
             "Model",
+
             "Accuracy",
+
             "Precision",
+
             "Recall",
+
             "F1 Score"
         ]
 
@@ -719,8 +795,11 @@ if os.path.exists(
 
                 [
                     "Accuracy",
+
                     "Precision",
+
                     "Recall",
+
                     "F1 Score"
                 ]
 
@@ -765,9 +844,9 @@ st.header(
 
 
 st.write("""
-This Healthcare Disease Prediction system
-uses Machine Learning to estimate diabetes
-risk based on patient health parameters.
+This Healthcare Disease Prediction system uses
+Machine Learning to estimate diabetes risk based
+on patient health parameters.
 
 Models evaluated:
 
@@ -775,8 +854,8 @@ Models evaluated:
 • Random Forest
 • XGBoost
 
-The best-performing model is used for
-the final prediction system.
+The best-performing model is used for the final
+prediction system.
 
 Technologies used:
 
@@ -786,6 +865,7 @@ Technologies used:
 • Scikit-learn
 • XGBoost
 • Streamlit
+• MySQL
 • ReportLab
 """)
 
@@ -795,11 +875,10 @@ Technologies used:
 # =========================================================
 
 st.warning(
-    "⚠️ Medical Disclaimer: This application "
-    "is developed for educational and "
-    "demonstration purposes only. It is not "
-    "a substitute for professional medical "
-    "diagnosis or treatment."
+    "⚠️ Medical Disclaimer: This application is "
+    "developed for educational and demonstration "
+    "purposes only. It is not a substitute for "
+    "professional medical diagnosis or treatment."
 )
 
 
@@ -892,5 +971,291 @@ st.divider()
 st.caption(
     "🩺 Healthcare Disease Prediction | "
     "Machine Learning Project | "
-    "Developed using Python & Streamlit"
+    "Developed using Python, Streamlit & MySQL"
 )
+
+# =========================================================
+# PREDICTION HISTORY
+# =========================================================
+
+st.divider()
+
+st.header("📜 Prediction History")
+
+if st.button("🔄 Load Prediction History"):
+
+    try:
+
+        connection = get_db_connection()
+
+        query = """
+        SELECT
+            id,
+            pregnancies,
+            glucose,
+            blood_pressure,
+            skin_thickness,
+            insulin,
+            bmi,
+            diabetes_pedigree,
+            age,
+            prediction,
+            probability,
+            created_at
+        FROM prediction_history
+        ORDER BY id DESC
+        """
+
+        history = pd.read_sql(
+            query,
+            connection
+        )
+
+        connection.close()
+
+        if len(history) > 0:
+
+            history["probability"] = (
+                history["probability"] * 100
+            ).round(2)
+
+            history = history.rename(
+                columns={
+                    "id": "ID",
+                    "pregnancies": "Pregnancies",
+                    "glucose": "Glucose",
+                    "blood_pressure": "Blood Pressure",
+                    "skin_thickness": "Skin Thickness",
+                    "insulin": "Insulin",
+                    "bmi": "BMI",
+                    "diabetes_pedigree": "Diabetes Pedigree",
+                    "age": "Age",
+                    "prediction": "Prediction",
+                    "probability": "Probability %",
+                    "created_at": "Date"
+                }
+            )
+
+            st.dataframe(
+                history,
+                use_container_width=True,
+                hide_index=True
+            )
+
+        else:
+
+            st.info(
+                "No prediction history found."
+            )
+
+    except Exception as e:
+
+        st.error(
+            f"Database Error: {e}"
+        )
+        
+# =========================================================
+# DATABASE DASHBOARD
+# =========================================================
+
+st.divider()
+
+st.header("📊 Prediction Dashboard")
+
+try:
+
+    connection = get_db_connection()
+
+    dashboard_query = """
+    SELECT
+        prediction,
+        probability
+    FROM prediction_history
+    """
+
+    dashboard_data = pd.read_sql(
+        dashboard_query,
+        connection
+    )
+
+    connection.close()
+
+    if not dashboard_data.empty:
+
+        total_predictions = len(dashboard_data)
+
+        higher_risk = len(
+            dashboard_data[
+                dashboard_data["prediction"] == "Higher Risk"
+            ]
+        )
+
+        lower_risk = len(
+            dashboard_data[
+                dashboard_data["prediction"] == "Lower Risk"
+            ]
+        )
+
+        average_probability = (
+            dashboard_data["probability"].mean() * 100
+        )
+
+        # -------------------------------------------------
+        # DASHBOARD CARDS
+        # -------------------------------------------------
+
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            st.metric(
+                "📊 Total Predictions",
+                total_predictions
+            )
+
+        with col2:
+            st.metric(
+                "🔴 Higher Risk",
+                higher_risk
+            )
+
+        with col3:
+            st.metric(
+                "🟢 Lower Risk",
+                lower_risk
+            )
+
+        with col4:
+            st.metric(
+                "📈 Avg Probability",
+                f"{average_probability:.2f}%"
+            )
+
+        # -------------------------------------------------
+        # RISK DISTRIBUTION
+        # -------------------------------------------------
+
+        st.subheader("📊 Risk Distribution")
+
+        risk_data = pd.DataFrame({
+            "Risk": [
+                "Higher Risk",
+                "Lower Risk"
+            ],
+            "Count": [
+                higher_risk,
+                lower_risk
+            ]
+        })
+
+        st.bar_chart(
+            risk_data.set_index("Risk")
+        )
+
+    else:
+
+        st.info(
+            "No prediction data available yet."
+        )
+
+except Exception as e:
+
+    st.error(
+        f"Dashboard Database Error: {e}"
+    )        
+
+# =========================================================
+# DATABASE HISTORY TOOLS
+# =========================================================
+
+st.divider()
+
+st.header("🗂️ Database History")
+
+try:
+
+    connection = get_db_connection()
+
+    history_query = """
+    SELECT
+        id,
+        pregnancies,
+        glucose,
+        blood_pressure,
+        skin_thickness,
+        insulin,
+        bmi,
+        diabetes_pedigree,
+        age,
+        prediction,
+        probability
+    FROM prediction_history
+    ORDER BY id DESC
+    """
+
+    history_data = pd.read_sql(
+        history_query,
+        connection
+    )
+
+    connection.close()
+
+    if not history_data.empty:
+
+        # Convert probability to percentage
+        history_data["probability"] = (
+            history_data["probability"] * 100
+        ).round(2)
+
+        history_data = history_data.rename(
+            columns={
+                "id": "ID",
+                "pregnancies": "Pregnancies",
+                "glucose": "Glucose",
+                "blood_pressure": "Blood Pressure",
+                "skin_thickness": "Skin Thickness",
+                "insulin": "Insulin",
+                "bmi": "BMI",
+                "diabetes_pedigree": "Diabetes Pedigree",
+                "age": "Age",
+                "prediction": "Prediction",
+                "probability": "Probability %"
+            }
+        )
+
+        # -------------------------------------------------
+        # SHOW HISTORY
+        # -------------------------------------------------
+
+        st.dataframe(
+            history_data,
+            use_container_width=True,
+            hide_index=True
+        )
+
+        # -------------------------------------------------
+        # CSV DOWNLOAD
+        # -------------------------------------------------
+
+        csv_data = history_data.to_csv(
+            index=False
+        )
+
+        st.download_button(
+            label="📥 Download Prediction History",
+            data=csv_data,
+            file_name="prediction_history.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+
+    else:
+
+        st.info(
+            "No prediction history available."
+        )
+
+except Exception as e:
+
+    st.error(
+        f"History Error: {e}"
+    )    

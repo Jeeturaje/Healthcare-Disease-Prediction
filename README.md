@@ -105,3 +105,7 @@ medical diagnosis or treatment.
 ## 👨‍💻 Author
 
 Jeetu Raje
+
+## 🌐 Live Demo
+
+[🚀 Open Healthcare Disease Prediction App](https://healthcare-disease-prediction-9oejfan3twknzznsktjbxe.streamlit.app/)
